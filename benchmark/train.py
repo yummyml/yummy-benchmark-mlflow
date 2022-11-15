@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+import os
+import shutil
+import json
+import glob
+from typing import Dict
+import mlflow
+import mlflow.lightgbm
+import numpy as np
+from collections import Counter
+import pandas as pd
+import lightgbm as lgb
+from sklearn.datasets import load_breast_cancer,load_boston,load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import mean_squared_error,roc_auc_score,precision_score
+import catboost as cb
+import catboost.datasets as cbd
+
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
+
+shutil.rmtree('mlruns', ignore_errors=True)
+try:
+    os.remove("mlruns.db")
+    os.remove("models_list.json")
+except: ...
+
+def lightgbm_train(model_name: str, params: Dict[str, int], dataset_func):
+    ds=dataset_func()
+    df=pd.DataFrame(ds.data,columns=ds.feature_names)
+    y=ds.target
+    sc=StandardScaler()
+    sc.fit(df)
+    X=pd.DataFrame(sc.fit_transform(df))
+    X_train,X_test,y_train,y_test=train_test_split(X, y, test_size=0.3, random_state=0)
+    print(X_test.head())
+    d_train=lgb.Dataset(X_train, label=y_train)
+    clf=lgb.train(params, d_train, 100)
+
+    mlflow.set_tracking_uri("sqlite:///mlruns.db")
+    mlflow.set_experiment(model_name)
+    with mlflow.start_run() as run:
+        mlflow.lightgbm.log_model(clf, model_name, registered_model_name=model_name)
+
+def catboost_train(model_name: str):
+    train, test = cbd.adult()
+    for dataset in (train, test, ):
+        for name in (name for name, dtype in dict(dataset.dtypes).items() if dtype == np.object):
+            dataset[name].fillna('nan', inplace=True)
+
+    X_train, y_train = train.drop('income', axis=1), train.income
+    X_test, y_test = test.drop('income', axis=1), test.income
+
+    model = cb.CatBoostClassifier(
+    class_names=('<=50K', '>50K'),
+    loss_function='Logloss',
+    eval_metric='AUC',
+    custom_metric=['AUC'],
+    iterations=100,
+    random_seed=20181224,
+    learning_rate=0.4234185321620083,
+    depth=5,
+    l2_leaf_reg=9.464266235679002)
+    model.fit(cb.Pool(X_train, y_train, cat_features=np.where(X_train.dtypes != np.float)[0]), verbose=False)
+
+    mlflow.set_tracking_uri("sqlite:///mlruns.db")
+    mlflow.set_experiment(model_name)
+    with mlflow.start_run() as run:
+        mlflow.catboost.log_model(model, model_name, registered_model_name=model_name)
+
+# LIGHTGBM
+
+# train binary
+model_name = "binary_lightgbm"
+params = {
+  "learning_rate": 0.03,
+  "boosting_type": "gbdt",
+  "objective": "binary",
+  "metric": "binary_logloss",
+  "max_depth": 10
+}
+
+dataset_func = load_breast_cancer
+
+lightgbm_train(model_name, params, dataset_func)
+
+
+# train multiclass
+model_name = "multiclass_lightgbm"
+params = {
+  "learning_rate": 0.03,
+  "boosting_type": "gbdt",
+  "objective": "multiclass",
+  "metric": "multi_logloss",
+  "max_depth": 10,
+  "num_class": 3
+}
+
+dataset_func = load_wine
+
+lightgbm_train(model_name, params, dataset_func)
+
+# CATBOOST 
+catboost_train("binary_catboost")
+
+with open("models_list.json", "w") as f:
+    f.write(json.dumps(glob.glob('/benchmark/mlruns/**/MLmodel', recursive=True)))
+
