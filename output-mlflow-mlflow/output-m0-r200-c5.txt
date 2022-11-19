@@ -1,0 +1,9 @@
+Requests      [total, rate, throughput]         12000, 200.02, 28.46
+Duration      [total, attack, wait]             1m5s, 59.995s, 5s
+Latencies     [min, mean, 50, 90, 95, 99, max]  6.111ms, 4.61s, 5s, 5s, 5s, 5.001s, 5.012s
+Bytes In      [total, mean]                     122100, 10.18
+Bytes Out     [total, mean]                     419950, 35.00
+Success       [ratio]                           15.42%
+Status Codes  [code:count]                      0:10150  200:1850  
+Error Set:
+Post "http://mlflow-mlflow-0:8080/invocations": context deadline exceeded (Client.Timeout exceeded while awaiting headers)

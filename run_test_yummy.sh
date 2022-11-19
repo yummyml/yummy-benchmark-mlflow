@@ -4,6 +4,7 @@
 NUM_SERVERS=1
 NAME="yummy-mlflow"
 TARGET=http://$NAME
+MODEL=2 # 0 - LightGBM Multiclass, 1 - LightGBM Binary, 2 - Catboost Binary
 
 echo "#######################"
 echo "### TESTING MODEL 0 ###"
@@ -18,7 +19,7 @@ for i in $(seq 0 1 $NUM_SERVERS); do
   docker run --rm -d --name $NAME-$i \
 	  -v $(pwd)/benchmark:/benchmark \
 	  --network app_default \
-	  qooba/yummy-mlflow:yummy /app/run.py 0
+	  qooba/yummy-mlflow:yummy /app/run.py $MODEL
 done
 
 
@@ -32,7 +33,7 @@ docker run --rm -it --name vegeta \
 	  --network app_default \
 	  -e NUM_SERVERS=$NUM_SERVERS \
 	  -e TARGET=$TARGET \
-	  -e MODEL=0 \
+	  -e MODEL=$MODEL \
 	  qooba/yummy-mlflow:vegeta \
 	  ./run-benchmark.sh
 

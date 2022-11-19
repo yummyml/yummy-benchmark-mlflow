@@ -5,5 +5,3 @@ venv
 requests*.json
 mlruns
 mlruns.db
-output-mlflow-mlflow
-output-yummy-mlflow
